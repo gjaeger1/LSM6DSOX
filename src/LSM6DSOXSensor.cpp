@@ -705,6 +705,16 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_X_AxesRaw(int16_t *Value)
   return LSM6DSOX_OK;
 }
 
+/**
+ * @brief  Whether or not new data from accelerometer is available
+ * @retval 1 in case new data is available, 0 if not
+ */
+int LSM6DSOXSensor::X_Available()
+{
+  uint8_t v = 0;
+  lsm6dsox_xl_flag_data_ready_get(&reg_ctx,&v);
+  return (v > 0) ? 1 : 0;
+}
 
 /**
  * @brief  Get the LSM6DSOX accelerometer sensor axes
@@ -732,6 +742,38 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_X_Axes(int32_t *Acceleration)
   Acceleration[0] = (int32_t)((float)((float)data_raw.i16bit[0] * sensitivity));
   Acceleration[1] = (int32_t)((float)((float)data_raw.i16bit[1] * sensitivity));
   Acceleration[2] = (int32_t)((float)((float)data_raw.i16bit[2] * sensitivity));
+
+  return LSM6DSOX_OK;
+}
+
+/**
+ * @brief  Get the LSM6DSOX accelerometer sensor axes but use stored sensitivities
+ * @param  Acceleration pointer where the values of the axes are written
+ * @retval 0 in case of success, an error code otherwise
+ */
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_X_Axes_StoredSensitivity(int32_t *Acceleration)
+{
+  axis3bit16_t data_raw;
+  
+  /* Read raw data values. */
+  if (lsm6dsox_acceleration_raw_get(&reg_ctx, data_raw.u8bit) != LSM6DSOX_OK)
+  {
+    return LSM6DSOX_ERROR;
+  }
+
+  if(x_sensitivity <= 0.0f)
+  {
+    /* Get LSM6DSOX actual sensitivity. */
+    if (Get_X_Sensitivity(&x_sensitivity) != LSM6DSOX_OK)
+    {
+      return LSM6DSOX_ERROR;
+    }
+  }
+
+  /* Calculate the data. */
+  Acceleration[0] = (int32_t)((float)((float)data_raw.i16bit[0] * x_sensitivity));
+  Acceleration[1] = (int32_t)((float)((float)data_raw.i16bit[1] * x_sensitivity));
+  Acceleration[2] = (int32_t)((float)((float)data_raw.i16bit[2] * x_sensitivity));
 
   return LSM6DSOX_OK;
 }
@@ -1114,6 +1156,17 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Set_G_FS(int32_t FullScale)
 }
 
 /**
+ * @brief  Whether or not new data from gyro is available
+ * @retval 1 in case new data is available, 0 if not
+ */
+int LSM6DSOXSensor::G_Available()
+{
+  uint8_t v = 0;
+  lsm6dsox_gy_flag_data_ready_get(&reg_ctx,&v);
+  return (v > 0) ? 1 : 0;
+}
+
+/**
  * @brief  Get the LSM6DSOX gyroscope sensor raw axes
  * @param  Value pointer where the raw values of the axes are written
  * @retval 0 in case of success, an error code otherwise
@@ -1166,6 +1219,39 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_G_Axes(int32_t *AngularRate)
 
   return LSM6DSOX_OK;
 }
+
+/**
+ * @brief  Get the LSM6DSOX gyroscope sensor axes with stored sensitivities
+ * @param  AngularRate pointer where the values of the axes are written
+ * @retval 0 in case of success, an error code otherwise
+ */
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_G_Axes_StoredSensitivity(int32_t *AngularRate)
+{
+  axis3bit16_t data_raw;
+
+  /* Read raw data values. */
+  if (lsm6dsox_angular_rate_raw_get(&reg_ctx, data_raw.u8bit) != LSM6DSOX_OK)
+  {
+    return LSM6DSOX_ERROR;
+  }
+
+  if(g_sensitivity <= 0.0f)
+  {
+    /* Get LSM6DSOX actual sensitivity. */
+    if (Get_G_Sensitivity(&g_sensitivity) != LSM6DSOX_OK)
+    {
+      return LSM6DSOX_ERROR;
+    }
+  }
+
+  /* Calculate the data. */
+  AngularRate[0] = (int32_t)((float)((float)data_raw.i16bit[0] * g_sensitivity));
+  AngularRate[1] = (int32_t)((float)((float)data_raw.i16bit[1] * g_sensitivity));
+  AngularRate[2] = (int32_t)((float)((float)data_raw.i16bit[2] * g_sensitivity));
+
+  return LSM6DSOX_OK;
+}
+
 
 
 /**

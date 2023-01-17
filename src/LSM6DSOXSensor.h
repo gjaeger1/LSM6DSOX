@@ -51,10 +51,10 @@
 
 /* Defines -------------------------------------------------------------------*/
 
-#define LSM6DSOX_ACC_SENSITIVITY_FS_2G   0.061f
-#define LSM6DSOX_ACC_SENSITIVITY_FS_4G   0.122f
-#define LSM6DSOX_ACC_SENSITIVITY_FS_8G   0.244f
-#define LSM6DSOX_ACC_SENSITIVITY_FS_16G  0.488f
+#define LSM6DSOX_ACC_SENSITIVITY_FS_2G   (2.0f / 32768.0f)
+#define LSM6DSOX_ACC_SENSITIVITY_FS_4G   (4.0f / 32768.0f)
+#define LSM6DSOX_ACC_SENSITIVITY_FS_8G   (8.0f / 32768.0f)
+#define LSM6DSOX_ACC_SENSITIVITY_FS_16G  (16.0f / 32768.0f)
 
 #define LSM6DSOX_GYRO_SENSITIVITY_FS_125DPS    4.375f
 #define LSM6DSOX_GYRO_SENSITIVITY_FS_250DPS    8.750f
@@ -130,6 +130,8 @@ class LSM6DSOXSensor
     LSM6DSOXStatusTypeDef ReadID(uint8_t *Id);
     LSM6DSOXStatusTypeDef Enable_X();
     LSM6DSOXStatusTypeDef Disable_X();
+  
+    int X_Available();
     LSM6DSOXStatusTypeDef Get_X_Sensitivity(float *Sensitivity);
     LSM6DSOXStatusTypeDef Get_X_ODR(float *Odr);
     LSM6DSOXStatusTypeDef Set_X_ODR(float Odr);
@@ -138,6 +140,7 @@ class LSM6DSOXSensor
     LSM6DSOXStatusTypeDef Set_X_FS(int32_t FullScale);
     LSM6DSOXStatusTypeDef Get_X_AxesRaw(int16_t *Value);
     LSM6DSOXStatusTypeDef Get_X_Axes(int32_t *Acceleration);
+    LSM6DSOXStatusTypeDef Get_X_Axes_StoredSensitivity(int32_t *Acceleration);
     
     LSM6DSOXStatusTypeDef Enable_G();
     LSM6DSOXStatusTypeDef Disable_G();
@@ -147,8 +150,10 @@ class LSM6DSOXSensor
     LSM6DSOXStatusTypeDef Set_G_ODR_With_Mode(float Odr, LSM6DSOX_GYRO_Operating_Mode_t Mode);
     LSM6DSOXStatusTypeDef Get_G_FS(int32_t *FullScale);
     LSM6DSOXStatusTypeDef Set_G_FS(int32_t FullScale);
+    int G_Available();
     LSM6DSOXStatusTypeDef Get_G_AxesRaw(int16_t *Value);
     LSM6DSOXStatusTypeDef Get_G_Axes(int32_t *AngularRate);
+    LSM6DSOXStatusTypeDef Get_G_Axes_StoredSensitivity(int32_t *AngularRate);
     
     LSM6DSOXStatusTypeDef Read_Reg(uint8_t reg, uint8_t *Data);
     LSM6DSOXStatusTypeDef Write_Reg(uint8_t reg, uint8_t Data);
@@ -264,11 +269,11 @@ class LSM6DSOXSensor
       }
 		
       if (dev_i2c) {
-        dev_i2c->beginTransmission(((uint8_t)(((address) >> 1) & 0x7F)));
+        dev_i2c->beginTransmission(address);//((uint8_t)(((address) >> 1) & 0x7F)));
         dev_i2c->write(RegisterAddr);
         dev_i2c->endTransmission(false);
 
-        dev_i2c->requestFrom(((uint8_t)(((address) >> 1) & 0x7F)), (uint8_t) NumByteToRead);
+        dev_i2c->requestFrom(address /*((uint8_t)(((address) >> 1) & 0x7F))*/, (uint8_t) NumByteToRead);
 
         int i=0;
         while (dev_i2c->available()) {
@@ -311,7 +316,7 @@ class LSM6DSOXSensor
       }
   
       if (dev_i2c) {
-        dev_i2c->beginTransmission(((uint8_t)(((address) >> 1) & 0x7F)));
+        dev_i2c->beginTransmission(address);//((uint8_t)(((address) >> 1) & 0x7F)));
 
         dev_i2c->write(RegisterAddr);
         for (uint16_t i = 0 ; i < NumByteToWrite ; i++) {
@@ -352,6 +357,9 @@ class LSM6DSOXSensor
     
     
     lsm6dsox_ctx_t reg_ctx;
+  
+    float g_sensitivity = 0.0f;
+    float x_sensitivity = 0.0f;
     
 };
 
