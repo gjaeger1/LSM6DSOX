@@ -44,9 +44,11 @@
 
 
 /* Includes ------------------------------------------------------------------*/
+#ifdef ADMORPH_PLATFORM_IS_PICO
+    #include "pico/binary_info.h"
+    #include "hardware/i2c.h"
+#endif
 
-#include "Wire.h"
-#include "SPI.h"
 #include "lsm6dsox_reg.h"
 
 /* Defines -------------------------------------------------------------------*/
@@ -123,8 +125,7 @@ typedef struct {
 class LSM6DSOXSensor
 {
   public:
-    LSM6DSOXSensor(TwoWire *i2c, uint8_t address=LSM6DSOX_I2C_ADD_H);
-    LSM6DSOXSensor(SPIClass *spi, int cs_pin, uint32_t spi_speed=2000000);
+    LSM6DSOXSensor(i2c_inst_t* i2c_instance = i2c_default, uint8_t address=LSM6DSOX_I2C_ADD_H);
     LSM6DSOXStatusTypeDef begin();
     LSM6DSOXStatusTypeDef end();
     LSM6DSOXStatusTypeDef ReadID(uint8_t *Id);
@@ -140,7 +141,7 @@ class LSM6DSOXSensor
     LSM6DSOXStatusTypeDef Set_X_FS(int32_t FullScale);
     LSM6DSOXStatusTypeDef Get_X_AxesRaw(int16_t *Value);
     LSM6DSOXStatusTypeDef Get_X_Axes(int32_t *Acceleration);
-    LSM6DSOXStatusTypeDef Get_X_Axes_StoredSensitivity(int32_t *Acceleration);
+    LSM6DSOXStatusTypeDef Get_X_Axes_StoredSensitivity(float *Acceleration);
     
     LSM6DSOXStatusTypeDef Enable_G();
     LSM6DSOXStatusTypeDef Disable_G();
@@ -153,7 +154,7 @@ class LSM6DSOXSensor
     int G_Available();
     LSM6DSOXStatusTypeDef Get_G_AxesRaw(int16_t *Value);
     LSM6DSOXStatusTypeDef Get_G_Axes(int32_t *AngularRate);
-    LSM6DSOXStatusTypeDef Get_G_Axes_StoredSensitivity(int32_t *AngularRate);
+    LSM6DSOXStatusTypeDef Get_G_Axes_StoredSensitivity(float *AngularRate);
     
     LSM6DSOXStatusTypeDef Read_Reg(uint8_t reg, uint8_t *Data);
     LSM6DSOXStatusTypeDef Write_Reg(uint8_t reg, uint8_t Data);
@@ -249,42 +250,9 @@ class LSM6DSOXSensor
      */
     uint8_t IO_Read(uint8_t* pBuffer, uint8_t RegisterAddr, uint16_t NumByteToRead)
     {        
-      if (dev_spi) {
-        dev_spi->beginTransaction(SPISettings(spi_speed, MSBFIRST, SPI_MODE3));
-
-        digitalWrite(cs_pin, LOW);
-
-        /* Write Reg Address */
-        dev_spi->transfer(RegisterAddr | 0x80);
-        /* Read the data */
-        for (uint16_t i=0; i<NumByteToRead; i++) {
-          *(pBuffer+i) = dev_spi->transfer(0x00);
-        }
-         
-        digitalWrite(cs_pin, HIGH);
-
-        dev_spi->endTransaction();
-
-        return 0;
-      }
-		
-      if (dev_i2c) {
-        dev_i2c->beginTransmission(address);//((uint8_t)(((address) >> 1) & 0x7F)));
-        dev_i2c->write(RegisterAddr);
-        dev_i2c->endTransmission(false);
-
-        dev_i2c->requestFrom(address /*((uint8_t)(((address) >> 1) & 0x7F))*/, (uint8_t) NumByteToRead);
-
-        int i=0;
-        while (dev_i2c->available()) {
-          pBuffer[i] = dev_i2c->read();
-          i++;
-        }
-
-        return 0;
-      }
-
-      return 1;
+      int res = i2c_write_blocking(this->i2c_instance, address, &RegisterAddr, sizeof(uint8_t), true);
+      i2c_read_blocking(this->i2c_instance, address, pBuffer, (uint8_t) NumByteToRead, false);
+      return 0;
     }
     
     /**
@@ -296,39 +264,9 @@ class LSM6DSOXSensor
      */
     uint8_t IO_Write(uint8_t* pBuffer, uint8_t RegisterAddr, uint16_t NumByteToWrite)
     {  
-      if (dev_spi) {
-        dev_spi->beginTransaction(SPISettings(spi_speed, MSBFIRST, SPI_MODE3));
-
-        digitalWrite(cs_pin, LOW);
-
-        /* Write Reg Address */
-        dev_spi->transfer(RegisterAddr);
-        /* Write the data */
-        for (uint16_t i=0; i<NumByteToWrite; i++) {
-          dev_spi->transfer(pBuffer[i]);
-        }
-
-        digitalWrite(cs_pin, HIGH);
-
-        dev_spi->endTransaction();
-
-        return 0;                    
-      }
-  
-      if (dev_i2c) {
-        dev_i2c->beginTransmission(address);//((uint8_t)(((address) >> 1) & 0x7F)));
-
-        dev_i2c->write(RegisterAddr);
-        for (uint16_t i = 0 ; i < NumByteToWrite ; i++) {
-          dev_i2c->write(pBuffer[i]);
-        }
-
-        dev_i2c->endTransmission(true);
-
-        return 0;
-      }
-
-      return 1;
+      int res = i2c_write_blocking(this->i2c_instance, address, &RegisterAddr, sizeof(uint8_t), true);
+      res = i2c_write_blocking(this->i2c_instance, address, pBuffer, NumByteToWrite, false);
+      return 0;
     }
 
   private:
@@ -341,13 +279,10 @@ class LSM6DSOXSensor
   
 
     /* Helper classes. */
-    TwoWire *dev_i2c;
-    SPIClass *dev_spi;
+    i2c_inst_t* i2c_instance;
     
     /* Configuration */
     uint8_t address;
-    int cs_pin;
-    uint32_t spi_speed;
     
     lsm6dsox_odr_xl_t acc_odr;
     lsm6dsox_odr_g_t gyro_odr;

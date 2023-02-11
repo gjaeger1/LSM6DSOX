@@ -40,7 +40,7 @@
 /* Includes ------------------------------------------------------------------*/
 
 #include "LSM6DSOXSensor.h"
-
+#include <cstring>
 
 /* Class Implementation ------------------------------------------------------*/
 
@@ -48,30 +48,13 @@
  * @param i2c object of an helper class which handles the I2C peripheral
  * @param address the address of the component's instance
  */
-LSM6DSOXSensor::LSM6DSOXSensor(TwoWire *i2c, uint8_t address) : dev_i2c(i2c), address(address)
+LSM6DSOXSensor::LSM6DSOXSensor(i2c_inst_t* i2c, uint8_t address) : i2c_instance(i2c), address(address)
 {
-  dev_spi = NULL;
   reg_ctx.write_reg = LSM6DSOX_io_write;
   reg_ctx.read_reg = LSM6DSOX_io_read;
   reg_ctx.handle = (void *)this;
   acc_is_enabled = 0U;
   gyro_is_enabled = 0U;
-}
-
-/** Constructor
- * @param spi object of an helper class which handles the SPI peripheral
- * @param cs_pin the chip select pin
- * @param spi_speed the SPI speed
- */
-LSM6DSOXSensor::LSM6DSOXSensor(SPIClass *spi, int cs_pin, uint32_t spi_speed) : dev_spi(spi), cs_pin(cs_pin), spi_speed(spi_speed)
-{
-  reg_ctx.write_reg = LSM6DSOX_io_write;
-  reg_ctx.read_reg = LSM6DSOX_io_read;
-  reg_ctx.handle = (void *)this;
-  dev_i2c = NULL;
-  address = 0; 
-  acc_is_enabled = 0U;
-  gyro_is_enabled = 0U;  
 }
 
 /**
@@ -80,13 +63,6 @@ LSM6DSOXSensor::LSM6DSOXSensor(SPIClass *spi, int cs_pin, uint32_t spi_speed) : 
  */
 LSM6DSOXStatusTypeDef LSM6DSOXSensor::begin()
 {
-  if(dev_spi)
-  {
-    // Configure CS pin
-    pinMode(cs_pin, OUTPUT);
-    digitalWrite(cs_pin, HIGH); 
-  }
-
   /* Disable I3C */
   if (lsm6dsox_i3c_disable_set(&reg_ctx, LSM6DSOX_I3C_DISABLE) != LSM6DSOX_OK)
   {
@@ -163,13 +139,6 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::end()
   if (Disable_G() != LSM6DSOX_OK)
   {
     return LSM6DSOX_ERROR;
-  }
-
-  /* Reset CS configuration */
-  if(dev_spi)
-  {
-    // Configure CS pin
-    pinMode(cs_pin, INPUT); 
   }
 
   return LSM6DSOX_OK;
@@ -751,7 +720,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_X_Axes(int32_t *Acceleration)
  * @param  Acceleration pointer where the values of the axes are written
  * @retval 0 in case of success, an error code otherwise
  */
-LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_X_Axes_StoredSensitivity(int32_t *Acceleration)
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_X_Axes_StoredSensitivity(float *Acceleration)
 {
   axis3bit16_t data_raw;
   
@@ -771,9 +740,9 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_X_Axes_StoredSensitivity(int32_t *Acce
   }
 
   /* Calculate the data. */
-  Acceleration[0] = (int32_t)((float)((float)data_raw.i16bit[0] * x_sensitivity));
-  Acceleration[1] = (int32_t)((float)((float)data_raw.i16bit[1] * x_sensitivity));
-  Acceleration[2] = (int32_t)((float)((float)data_raw.i16bit[2] * x_sensitivity));
+  Acceleration[0] = ((float)((float)data_raw.i16bit[0] * x_sensitivity));
+  Acceleration[1] = ((float)((float)data_raw.i16bit[1] * x_sensitivity));
+  Acceleration[2] = ((float)((float)data_raw.i16bit[2] * x_sensitivity));
 
   return LSM6DSOX_OK;
 }
@@ -1225,7 +1194,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_G_Axes(int32_t *AngularRate)
  * @param  AngularRate pointer where the values of the axes are written
  * @retval 0 in case of success, an error code otherwise
  */
-LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_G_Axes_StoredSensitivity(int32_t *AngularRate)
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_G_Axes_StoredSensitivity(float *AngularRate)
 {
   axis3bit16_t data_raw;
 
@@ -1245,9 +1214,9 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_G_Axes_StoredSensitivity(int32_t *Angu
   }
 
   /* Calculate the data. */
-  AngularRate[0] = (int32_t)((float)((float)data_raw.i16bit[0] * g_sensitivity));
-  AngularRate[1] = (int32_t)((float)((float)data_raw.i16bit[1] * g_sensitivity));
-  AngularRate[2] = (int32_t)((float)((float)data_raw.i16bit[2] * g_sensitivity));
+  AngularRate[0] = ((float)((float)data_raw.i16bit[0] * g_sensitivity));
+  AngularRate[1] = ((float)((float)data_raw.i16bit[1] * g_sensitivity));
+  AngularRate[2] = ((float)((float)data_raw.i16bit[2] * g_sensitivity));
 
   return LSM6DSOX_OK;
 }
@@ -1508,7 +1477,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Enable_Pedometer()
   }
 
   /* Wait for 10 ms */
-  delay(10);
+  sleep_ms(10);
 
   /* Enable pedometer algorithm. */
   emb_sens.step = PROPERTY_ENABLE;
@@ -1645,7 +1614,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Enable_Tilt_Detection(LSM6DSOX_SensorIntPi
   }
 
   /* Wait for 10 ms */
-  delay(10);
+  sleep_ms(10);
 
   /* Enable tilt algorithm. */
   emb_sens.tilt = PROPERTY_ENABLE;
