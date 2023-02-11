@@ -51,6 +51,9 @@
 
 #include "lsm6dsox_reg.h"
 
+#include <vector>
+#include <cstring>
+
 /* Defines -------------------------------------------------------------------*/
 
 #define LSM6DSOX_ACC_SENSITIVITY_FS_2G   (2.0f / 32768.0f)
@@ -250,8 +253,12 @@ class LSM6DSOXSensor
      */
     uint8_t IO_Read(uint8_t* pBuffer, uint8_t RegisterAddr, uint16_t NumByteToRead)
     {        
-      int res = i2c_write_blocking(this->i2c_instance, address, &RegisterAddr, sizeof(uint8_t), true);
-      i2c_read_blocking(this->i2c_instance, address, pBuffer, (uint8_t) NumByteToRead, false);
+      if(i2c_write_blocking(this->i2c_instance, address, &RegisterAddr, sizeof(uint8_t), true) < 0)
+        return 1;
+
+      if(i2c_read_blocking(this->i2c_instance, address, pBuffer, (uint8_t) NumByteToRead, false) < 0)
+        return 1;
+
       return 0;
     }
     
@@ -264,8 +271,13 @@ class LSM6DSOXSensor
      */
     uint8_t IO_Write(uint8_t* pBuffer, uint8_t RegisterAddr, uint16_t NumByteToWrite)
     {  
-      int res = i2c_write_blocking(this->i2c_instance, address, &RegisterAddr, sizeof(uint8_t), true);
-      res = i2c_write_blocking(this->i2c_instance, address, pBuffer, NumByteToWrite, false);
+      std::vector<uint8_t> buf(NumByteToWrite+1);
+      buf[0] = RegisterAddr;
+      std::memcpy(&buf[1],pBuffer, NumByteToWrite);
+
+      if(i2c_write_blocking(this->i2c_instance, address, buf.data(), NumByteToWrite+1, true) < 0)
+        return 1;
+
       return 0;
     }
 
