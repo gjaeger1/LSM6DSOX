@@ -224,8 +224,11 @@ class LSM6DSOXSensor
     LSM6DSOXStatusTypeDef Get_FIFO_Data(uint8_t *Data);
     LSM6DSOXStatusTypeDef Get_FIFO_Sample(uint8_t *Sample, uint16_t Count = 1);
     LSM6DSOXStatusTypeDef Get_FIFO_X_Axes(int32_t *Acceleration);
+    LSM6DSOXStatusTypeDef Get_FIFO_X_Axes_StoredSensitivity(float *Acceleration);
+    LSM6DSOXStatusTypeDef Get_FIFO_Timestamp(uint32_t& Timestamp);
     LSM6DSOXStatusTypeDef Set_FIFO_X_BDR(float Bdr);
     LSM6DSOXStatusTypeDef Get_FIFO_G_Axes(int32_t *AngularVelocity);
+    LSM6DSOXStatusTypeDef Get_FIFO_G_Axes_StoredSensitivity(float *AngularVelocity);
     LSM6DSOXStatusTypeDef Set_FIFO_G_BDR(float Bdr);
 
     LSM6DSOXStatusTypeDef Get_MLC_Status(LSM6DSOX_MLC_Status_t *Status);

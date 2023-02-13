@@ -3090,6 +3090,25 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_Sample(uint8_t *Sample, uint16_t 
 }
 
 /**
+ * @brief Get the LSM6DSOX FIFO timestamp single sample (32-bit)
+ * @param Timestamp variable to hold timestamp from FIFO
+ * @retval 0 in case of success, an error code otherwise
+*/
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_Timestamp(uint32_t& Timestamp)
+{
+  uint8_t data[6];
+
+  if (Get_FIFO_Data(data) != LSM6DSOX_OK)
+  {
+    return LSM6DSOX_ERROR;
+  }
+
+  Timestamp = ((uint32_t)data[3] << 24) | ((uint32_t)data[2] << 16) | ((uint32_t)data[1] << 8) | data[0];
+  Timestamp *= 25; // convert to micro seconds
+  return LSM6DSOX_OK;
+}
+
+/**
  * @brief  Get the LSM6DSOX FIFO accelero single sample (16-bit data per 3 axes) and calculate acceleration [mg]
  * @param  Acceleration FIFO accelero axes [mg]
  * @retval 0 in case of success, an error code otherwise
@@ -3125,6 +3144,43 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_X_Axes(int32_t *Acceleration)
 
   return LSM6DSOX_OK;
 }
+
+/**
+ * @brief  Get the LSM6DSOX FIFO accelero single sample (16-bit data per 3 axes) and calculate acceleration [mg]
+ * @param  Acceleration FIFO accelero axes [mg]
+ * @retval 0 in case of success, an error code otherwise
+ */
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_X_Axes_StoredSensitivity(float *Acceleration)
+{
+  uint8_t data[6];
+  int16_t data_raw[3];
+
+  if (Get_FIFO_Data(data) != LSM6DSOX_OK)
+  {
+    return LSM6DSOX_ERROR;
+  }
+
+  data_raw[0] = ((int16_t)data[1] << 8) | data[0];
+  data_raw[1] = ((int16_t)data[3] << 8) | data[2];
+  data_raw[2] = ((int16_t)data[5] << 8) | data[4];
+
+  if(x_sensitivity <= 0.0f)
+  {
+    /* Get LSM6DSOX actual sensitivity. */
+    if (Get_X_Sensitivity(&x_sensitivity) != LSM6DSOX_OK)
+    {
+      return LSM6DSOX_ERROR;
+    }
+  }
+
+  Acceleration[0] = (float)data_raw[0] * x_sensitivity;
+  Acceleration[1] = (float)data_raw[1] * x_sensitivity;
+  Acceleration[2] = (float)data_raw[2] * x_sensitivity;
+
+  return LSM6DSOX_OK;
+}
+
+
 
 /**
  * @brief  Set the LSM6DSOX FIFO accelero BDR value
@@ -3188,6 +3244,41 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_G_Axes(int32_t *AngularVelocity)
   AngularVelocity[0] = (int32_t)angular_velocity_float[0];
   AngularVelocity[1] = (int32_t)angular_velocity_float[1];
   AngularVelocity[2] = (int32_t)angular_velocity_float[2];
+
+  return LSM6DSOX_OK;
+}
+
+/**
+ * @brief  Get the LSM6DSOX FIFO gyro single sample (16-bit data per 3 axes) and calculate angular velocity [mDPS]
+ * @param  AngularVelocity FIFO gyro axes [mDPS]
+ * @retval 0 in case of success, an error code otherwise
+ */
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_G_Axes_StoredSensitivity(float *AngularVelocity)
+{
+  uint8_t data[6];
+  int16_t data_raw[3];
+
+  if (Get_FIFO_Data(data) != LSM6DSOX_OK)
+  {
+    return LSM6DSOX_ERROR;
+  }
+
+  data_raw[0] = ((int16_t)data[1] << 8) | data[0];
+  data_raw[1] = ((int16_t)data[3] << 8) | data[2];
+  data_raw[2] = ((int16_t)data[5] << 8) | data[4];
+
+  if(g_sensitivity <= 0.0f)
+  {
+    /* Get LSM6DSOX actual sensitivity. */
+    if (Get_G_Sensitivity(&g_sensitivity) != LSM6DSOX_OK)
+    {
+      return LSM6DSOX_ERROR;
+    }
+  }
+
+  AngularVelocity[0] = (float)data_raw[0] * g_sensitivity;
+  AngularVelocity[1] = (float)data_raw[1] * g_sensitivity;
+  AngularVelocity[2] = (float)data_raw[2] * g_sensitivity;
 
   return LSM6DSOX_OK;
 }
