@@ -50,6 +50,7 @@
 #endif
 
 #include "lsm6dsox_reg.h"
+#include "st_fifo.h"
 
 #include <vector>
 #include <cstring>
@@ -128,6 +129,13 @@ typedef struct {
 class LSM6DSOXSensor
 {
   public:
+    struct Measurement
+    {
+      uint32_t timestamp;
+      st_fifo_sensor_type sensor_tag;
+      float data[3];
+    };
+
     LSM6DSOXSensor(i2c_inst_t* i2c_instance = i2c_default, uint8_t address=LSM6DSOX_I2C_ADD_H);
     LSM6DSOXStatusTypeDef begin();
     LSM6DSOXStatusTypeDef end();
@@ -220,16 +228,23 @@ class LSM6DSOXSensor
     LSM6DSOXStatusTypeDef Set_FIFO_Watermark_Level(uint16_t Watermark);
     LSM6DSOXStatusTypeDef Set_FIFO_Stop_On_Fth(uint8_t Status);
     LSM6DSOXStatusTypeDef Set_FIFO_Mode(uint8_t Mode);
+    LSM6DSOXStatusTypeDef Set_FIFO_X_BDR(float Bdr);
+    LSM6DSOXStatusTypeDef Set_FIFO_G_BDR(float Bdr);
+
+    // Reading FIFO
     LSM6DSOXStatusTypeDef Get_FIFO_Tag(uint8_t *Tag);
     LSM6DSOXStatusTypeDef Get_FIFO_Data(uint8_t *Data);
+    LSM6DSOXStatusTypeDef Get_FIFO_Samples(std::vector<Measurement>& Samples, int16_t Max_Count = -1);
+    LSM6DSOXStatusTypeDef Convert_FIFO_Samples(std::vector<Measurement>& Samples);
     LSM6DSOXStatusTypeDef Get_FIFO_Sample(uint8_t *Sample, uint16_t Count = 1);
+    
     LSM6DSOXStatusTypeDef Get_FIFO_X_Axes(int32_t *Acceleration);
     LSM6DSOXStatusTypeDef Get_FIFO_X_Axes_StoredSensitivity(float *Acceleration);
     LSM6DSOXStatusTypeDef Get_FIFO_Timestamp(uint32_t& Timestamp);
-    LSM6DSOXStatusTypeDef Set_FIFO_X_BDR(float Bdr);
+    
     LSM6DSOXStatusTypeDef Get_FIFO_G_Axes(int32_t *AngularVelocity);
     LSM6DSOXStatusTypeDef Get_FIFO_G_Axes_StoredSensitivity(float *AngularVelocity);
-    LSM6DSOXStatusTypeDef Set_FIFO_G_BDR(float Bdr);
+    
 
     LSM6DSOXStatusTypeDef Get_MLC_Status(LSM6DSOX_MLC_Status_t *Status);
     LSM6DSOXStatusTypeDef Get_MLC_Output(uint8_t *Output);
@@ -295,6 +310,7 @@ class LSM6DSOXSensor
 
     /* Helper classes. */
     i2c_inst_t* i2c_instance;
+    st_fifo_conf fifo_conf;
     
     /* Configuration */
     uint8_t address;

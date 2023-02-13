@@ -3,6 +3,7 @@ add_library(LSM6DSOX INTERFACE)
 target_sources(LSM6DSOX INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/LSM6DSOXSensor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/lsm6dsox_reg.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/st_fifo.c
         )
 target_include_directories(LSM6DSOX INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 #target_compile_definitions(LSM6DSOX INTERFACE PLATFORM_ALLOW_UNKNOWN_OS)

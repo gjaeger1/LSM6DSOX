@@ -41,6 +41,7 @@
 
 #include "LSM6DSOXSensor.h"
 #include <cstring>
+#include <cstdio>
 
 /* Class Implementation ------------------------------------------------------*/
 
@@ -63,6 +64,11 @@ LSM6DSOXSensor::LSM6DSOXSensor(i2c_inst_t* i2c, uint8_t address) : i2c_instance(
  */
 LSM6DSOXStatusTypeDef LSM6DSOXSensor::begin()
 {
+  /*Initialize config for ST FIFO Library for parsing*/
+  this->fifo_conf.device = ST_FIFO_LSM6DSOX;
+  this->fifo_conf.bdr_vsens = 0;
+	
+
   /* Disable I3C */
   if (lsm6dsox_i3c_disable_set(&reg_ctx, LSM6DSOX_I3C_DISABLE) != LSM6DSOX_OK)
   {
@@ -3033,6 +3039,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Set_FIFO_Mode(uint8_t Mode)
 
   if (lsm6dsox_fifo_mode_set(&reg_ctx, (lsm6dsox_fifo_mode_t)Mode) != LSM6DSOX_OK)
   {
+    st_fifo_init(&this->fifo_conf);
     return LSM6DSOX_ERROR;
   }
 
@@ -3043,7 +3050,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Set_FIFO_Mode(uint8_t Mode)
  * @brief  Get the LSM6DSOX FIFO tag
  * @param  Tag FIFO tag
  * @retval 0 in case of success, an error code otherwise
- */
+
 LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_Tag(uint8_t *Tag)
 {
   lsm6dsox_fifo_tag_t tag_local;
@@ -3056,13 +3063,13 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_Tag(uint8_t *Tag)
 	*Tag = (uint8_t)tag_local;
 
   return LSM6DSOX_OK;
-}
+} */
 
 /**
  * @brief  Get the LSM6DSOX FIFO raw data
  * @param  Data FIFO raw data array [6]
  * @retval 0 in case of success, an error code otherwise
- */
+
 LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_Data(uint8_t *Data)
 {
   if (lsm6dsox_read_reg(&reg_ctx, LSM6DSOX_FIFO_DATA_OUT_X_L, Data, 6) != LSM6DSOX_OK)
@@ -3071,7 +3078,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_Data(uint8_t *Data)
   }
 
   return LSM6DSOX_OK;
-}
+}*/
 
 /**
  * @brief  Get the LSM6DSOX FIFO sample
@@ -3084,6 +3091,108 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_Sample(uint8_t *Sample, uint16_t 
   if (lsm6dsox_read_reg(&reg_ctx, LSM6DSOX_FIFO_DATA_OUT_TAG, Sample, Count * 7) != LSM6DSOX_OK)
   {
     return LSM6DSOX_ERROR;
+  }
+
+  return LSM6DSOX_OK;
+}
+
+/**
+ * @brief  Get the LSM6DSOX FIFO samples
+ * @param  Samples Parsed samples from FIFO
+ * @param  Max_Count maximal number of samples to get from FIFO
+ * @retval 0 in case of success, an error code otherwise
+ */
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_Samples(std::vector<Measurement>& Samples, int16_t Max_Count)
+{
+  // get number of samples
+  uint16_t available = 0;
+  Get_FIFO_Num_Samples(&available);
+
+  // check that we do not try to read to much
+  if(Max_Count > 0)
+  {
+    available = std::min(static_cast<uint16_t>(Max_Count), available);
+  }
+
+  // allocate arrays
+  uint8_t* data = (uint8_t*)malloc(7*available*sizeof(uint8_t));
+ 
+  Samples.resize(0);
+  Samples.reserve(3*available); // 3 times for some reason? Maybe due to maximal compression?
+
+  // get data
+  Get_FIFO_Sample(data, available);
+
+  // allocate array to work with
+  st_fifo_out_slot out_slots[3];
+
+  // loop through all samples
+  for(uint16_t i = 0; i < available; i++)
+  {
+    uint16_t out_slot_size = 0;
+  
+    st_fifo_raw_slot sample;
+    memcpy(sample.fifo_data_out, &data[7*i], 7*sizeof(uint8_t));
+
+    st_fifo_decode(out_slots, &sample, &out_slot_size, 1);
+    for(int i = 0; i < out_slot_size; i++)
+    {
+      Measurement m;
+      m.timestamp = out_slots[i].timestamp;
+      m.sensor_tag = out_slots[i].sensor_tag;
+      m.data[0] = static_cast<float>(out_slots[i].sensor_data.data[0]);
+      m.data[1] = static_cast<float>(out_slots[i].sensor_data.data[1]);
+      m.data[2] = static_cast<float>(out_slots[i].sensor_data.data[2]);
+      Samples.push_back(m);
+    }  
+  }
+
+  // free memory
+  free(data); 
+
+  return LSM6DSOX_OK;
+}
+
+/**
+ * @brief  Convert LSM6DSOX FIFO samples (Accelerometer and Gyro)
+ * @param  Samples Parsed samples from FIFO
+ * @retval 0 in case of success, an error code otherwise
+ */
+LSM6DSOXStatusTypeDef LSM6DSOXSensor::Convert_FIFO_Samples(std::vector<Measurement>& Samples)
+{
+  // get sensitivities
+  if(x_sensitivity <= 0.0f)
+  {
+    /* Get LSM6DSOX actual sensitivity. */
+    if (Get_X_Sensitivity(&x_sensitivity) != LSM6DSOX_OK)
+    {
+      return LSM6DSOX_ERROR;
+    }
+  }
+
+  if(g_sensitivity <= 0.0f)
+  {
+    /* Get LSM6DSOX actual sensitivity. */
+    if (Get_G_Sensitivity(&g_sensitivity) != LSM6DSOX_OK)
+    {
+      return LSM6DSOX_ERROR;
+    }
+  }
+
+  for(int16_t i = 0; i < Samples.size(); i++)
+  {
+    if(Samples[i].sensor_tag == ST_FIFO_GYROSCOPE)
+    {
+      Samples[i].data[0] = ((float)Samples[i].data[0] * g_sensitivity);
+      Samples[i].data[1] = ((float)Samples[i].data[1] * g_sensitivity);
+      Samples[i].data[2] = ((float)Samples[i].data[2] * g_sensitivity);
+    }
+    else if(Samples[i].sensor_tag == ST_FIFO_ACCELEROMETER)
+    {
+      Samples[i].data[0] = ((float)Samples[i].data[0] * x_sensitivity);
+      Samples[i].data[1] = ((float)Samples[i].data[1] * x_sensitivity);
+      Samples[i].data[2] = ((float)Samples[i].data[2] * x_sensitivity);
+    }
   }
 
   return LSM6DSOX_OK;
@@ -3166,7 +3275,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_X_Axes_StoredSensitivity(float *A
 
   if(x_sensitivity <= 0.0f)
   {
-    /* Get LSM6DSOX actual sensitivity. */
+    // Get LSM6DSOX actual sensitivity. 
     if (Get_X_Sensitivity(&x_sensitivity) != LSM6DSOX_OK)
     {
       return LSM6DSOX_ERROR;
@@ -3178,7 +3287,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_X_Axes_StoredSensitivity(float *A
   Acceleration[2] = (float)data_raw[2] * x_sensitivity;
 
   return LSM6DSOX_OK;
-}
+} 
 
 
 
@@ -3197,11 +3306,51 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Set_FIFO_X_BDR(float Bdr)
             : (Bdr <=   52.0f) ? LSM6DSOX_XL_BATCHED_AT_52Hz
             : (Bdr <=  104.0f) ? LSM6DSOX_XL_BATCHED_AT_104Hz
             : (Bdr <=  208.0f) ? LSM6DSOX_XL_BATCHED_AT_208Hz
-            : (Bdr <=  416.0f) ? LSM6DSOX_XL_BATCHED_AT_417Hz
+            : (Bdr <=  417.0f) ? LSM6DSOX_XL_BATCHED_AT_417Hz
             : (Bdr <=  833.0f) ? LSM6DSOX_XL_BATCHED_AT_833Hz
-            : (Bdr <= 1660.0f) ? LSM6DSOX_XL_BATCHED_AT_1667Hz
-            : (Bdr <= 3330.0f) ? LSM6DSOX_XL_BATCHED_AT_3333Hz
+            : (Bdr <= 1667.0f) ? LSM6DSOX_XL_BATCHED_AT_1667Hz
+            : (Bdr <= 3333.0f) ? LSM6DSOX_XL_BATCHED_AT_3333Hz
             :                    LSM6DSOX_XL_BATCHED_AT_6667Hz;
+
+  switch (new_bdr)
+  {
+  case LSM6DSOX_XL_NOT_BATCHED:
+    this->fifo_conf.bdr_xl = 0;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_12Hz5:
+    this->fifo_conf.bdr_xl = 12.5;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_26Hz:
+    this->fifo_conf.bdr_xl = 26;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_52Hz:
+    this->fifo_conf.bdr_xl = 52;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_104Hz:
+    this->fifo_conf.bdr_xl = 104;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_208Hz:
+    this->fifo_conf.bdr_xl = 208;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_417Hz:
+    this->fifo_conf.bdr_xl = 416;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_833Hz:
+    this->fifo_conf.bdr_xl = 833;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_1667Hz:
+    this->fifo_conf.bdr_xl = 1667;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_3333Hz:
+    this->fifo_conf.bdr_xl = 3333;
+    break;
+  case LSM6DSOX_XL_BATCHED_AT_6667Hz:
+    this->fifo_conf.bdr_xl = 6667;
+    break;
+  
+  default:
+    break;
+  }
 
   if (lsm6dsox_fifo_xl_batch_set(&reg_ctx, new_bdr) != LSM6DSOX_OK)
   {
@@ -3269,7 +3418,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_G_Axes_StoredSensitivity(float *A
 
   if(g_sensitivity <= 0.0f)
   {
-    /* Get LSM6DSOX actual sensitivity. */
+    // Get LSM6DSOX actual sensitivity.
     if (Get_G_Sensitivity(&g_sensitivity) != LSM6DSOX_OK)
     {
       return LSM6DSOX_ERROR;
@@ -3281,7 +3430,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_FIFO_G_Axes_StoredSensitivity(float *A
   AngularVelocity[2] = (float)data_raw[2] * g_sensitivity;
 
   return LSM6DSOX_OK;
-}
+} 
 
 /**
  * @brief  Set the LSM6DSOX FIFO gyro BDR value
@@ -3298,11 +3447,54 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Set_FIFO_G_BDR(float Bdr)
             : (Bdr <=   52.0f) ? LSM6DSOX_GY_BATCHED_AT_52Hz
             : (Bdr <=  104.0f) ? LSM6DSOX_GY_BATCHED_AT_104Hz
             : (Bdr <=  208.0f) ? LSM6DSOX_GY_BATCHED_AT_208Hz
-            : (Bdr <=  416.0f) ? LSM6DSOX_GY_BATCHED_AT_417Hz
+            : (Bdr <=  417.0f) ? LSM6DSOX_GY_BATCHED_AT_417Hz
             : (Bdr <=  833.0f) ? LSM6DSOX_GY_BATCHED_AT_833Hz
-            : (Bdr <= 1660.0f) ? LSM6DSOX_GY_BATCHED_AT_1667Hz
-            : (Bdr <= 3330.0f) ? LSM6DSOX_GY_BATCHED_AT_3333Hz
+            : (Bdr <= 1667.0f) ? LSM6DSOX_GY_BATCHED_AT_1667Hz
+            : (Bdr <= 3333.0f) ? LSM6DSOX_GY_BATCHED_AT_3333Hz
             :                    LSM6DSOX_GY_BATCHED_AT_6667Hz;
+
+
+  switch (new_bdr)
+  {
+  case LSM6DSOX_GY_NOT_BATCHED:
+    this->fifo_conf.bdr_gy = 0;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_12Hz5:
+    this->fifo_conf.bdr_gy = 12.5;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_26Hz:
+    this->fifo_conf.bdr_gy = 26;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_52Hz:
+    this->fifo_conf.bdr_gy = 52;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_104Hz:
+    this->fifo_conf.bdr_gy = 104;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_208Hz:
+    this->fifo_conf.bdr_gy = 208;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_417Hz:
+    this->fifo_conf.bdr_gy = 416;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_833Hz:
+    this->fifo_conf.bdr_gy = 833;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_1667Hz:
+    this->fifo_conf.bdr_gy = 1667;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_3333Hz:
+    this->fifo_conf.bdr_gy = 3333;
+    break;
+  case LSM6DSOX_GY_BATCHED_AT_6667Hz:
+    this->fifo_conf.bdr_gy = 6667;
+    break;
+  
+  default:
+    break;
+  }
+
+  //this->fifo_conf.bdr_gy = 0;
 
   if (lsm6dsox_fifo_gy_batch_set(&reg_ctx, new_bdr) != LSM6DSOX_OK)
   {
