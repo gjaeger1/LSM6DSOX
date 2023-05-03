@@ -1187,7 +1187,7 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_G_Axes(int32_t *AngularRate)
     return LSM6DSOX_ERROR;
   }
 
-  /* Calculate the data. */
+  /* Calculate the angular rate in millidegrees per second (mdps). */
   AngularRate[0] = (int32_t)((float)((float)data_raw.i16bit[0] * sensitivity));
   AngularRate[1] = (int32_t)((float)((float)data_raw.i16bit[1] * sensitivity));
   AngularRate[2] = (int32_t)((float)((float)data_raw.i16bit[2] * sensitivity));
@@ -1219,10 +1219,10 @@ LSM6DSOXStatusTypeDef LSM6DSOXSensor::Get_G_Axes_StoredSensitivity(float *Angula
     }
   }
 
-  /* Calculate the data. */
-  AngularRate[0] = ((float)((float)data_raw.i16bit[0] * g_sensitivity));
-  AngularRate[1] = ((float)((float)data_raw.i16bit[1] * g_sensitivity));
-  AngularRate[2] = ((float)((float)data_raw.i16bit[2] * g_sensitivity));
+  /* Calculate the angular rate in millidegrees per second (mdps). */
+  AngularRate[0] = static_cast<float>(data_raw.i16bit[0]) * g_sensitivity;
+  AngularRate[1] = static_cast<float>(data_raw.i16bit[1]) * g_sensitivity;
+  AngularRate[2] = static_cast<float>(data_raw.i16bit[2]) * g_sensitivity;
 
   return LSM6DSOX_OK;
 }
