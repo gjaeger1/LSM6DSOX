@@ -44,10 +44,9 @@
 
 
 /* Includes ------------------------------------------------------------------*/
-#ifdef ADMORPH_PLATFORM_IS_PICO
-    #include "pico/binary_info.h"
-    #include "hardware/i2c.h"
-#endif
+#include "pico/binary_info.h"
+#include "hardware/i2c.h"
+
 
 #include "lsm6dsox_reg.h"
 #include "st_fifo.h"
