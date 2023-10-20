@@ -50,6 +50,12 @@
 #include "lsm6dsox_reg.h"
 
 /* Defines -------------------------------------------------------------------*/
+/* For compatibility with ESP32 platforms */
+#ifdef ESP32
+#ifndef MSBFIRST
+#define MSBFIRST SPI_MSBFIRST
+#endif
+#endif
 
 #define LSM6DSOX_ACC_SENSITIVITY_FS_2G   (2.0f / 32768.0f)
 #define LSM6DSOX_ACC_SENSITIVITY_FS_4G   (4.0f / 32768.0f)
